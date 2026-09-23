@@ -4,10 +4,12 @@ const fs = require("fs");
 
 const OWNER_IDS = ["30688400", "30717295", "30719424", "30772289", "33234717", "349482852"];
 const PROPS = ["firstname", "lastname", "hubspot_owner_id", "hs_lead_status", "createdate",
-  "lead_passed_date", "lead_status_change", "num_contacted_notes", "notes_last_contacted"];
+  "lead_passed_date", "lead_status_change", "num_contacted_notes", "notes_last_contacted",
+  "hs_analytics_source"];
 
 async function fetchContacts(token) {
-  const ytdStart = Date.UTC(new Date().getUTCFullYear(), 0, 1);
+  // Jan 1, or 31 days back if earlier, so "Last 30 Days" works in January
+  const ytdStart = Math.min(Date.UTC(new Date().getUTCFullYear(), 0, 1), Date.now() - 31 * 86400000);
   const all = [];
   let after;
   do {

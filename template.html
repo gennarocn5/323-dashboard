@@ -22,6 +22,7 @@
     .global-filter label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
     .global-filter select { padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; background: white; outline: none; cursor: pointer; font-weight: 500; color: #1a1a2e; }
     .global-filter select:focus { border-color: #a5b4fc; }
+    .global-filter input[type=date] { padding: 5px 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; background: white; outline: none; }
     .global-filter .range-label { font-size: 12px; color: #9ca3af; margin-left: 4px; }
 
     /* Summary bar */
@@ -133,12 +134,25 @@
       <label>Date Range</label>
       <select id="globalDateFilter" onchange="onGlobalDateChange()">
         <option value="ytd">Year to Date</option>
+        <option value="last_30">Last 30 Days</option>
         <option value="this_month">This Month</option>
         <option value="last_month">Last Month</option>
         <option value="this_week">This Week</option>
         <option value="last_week">Last Week</option>
+        <option value="custom">Custom Range…</option>
       </select>
+      <span id="customRange" style="display:none;align-items:center;gap:6px;">
+        <input type="date" id="customStart" onchange="onGlobalDateChange()">
+        <span style="color:#9ca3af;font-size:12px;">to</span>
+        <input type="date" id="customEnd" onchange="onGlobalDateChange()">
+      </span>
       <span class="range-label" id="rangeLabel"></span>
+      <label style="margin-left:16px;">Original Source</label>
+      <select id="sourceFilter" onchange="onGlobalDateChange()">
+        <option value="all">All Sources</option>
+        <option value="paid_social">Paid Social</option>
+        <option value="other">All Other Sources</option>
+      </select>
     </div>
     <div class="summary-bar" id="summaryBar"></div>
     <div class="tabs" id="tabs"></div>
@@ -192,6 +206,20 @@ function getMonday(d) {
   return startOfDay(x);
 }
 
+// Earliest date the data covers: Jan 1, or 31 days back if that's earlier (keeps "Last 30 Days" whole in January)
+const DATA_START = startOfDay(new Date(Math.min(
+  new Date(new Date().getFullYear(), 0, 1).getTime(),
+  Date.now() - 31 * 86400000
+)));
+
+function parseLocalDate(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+function toInputDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
 function getDateRange(key) {
   const now = new Date();
   let start, end = endOfDay(now);
@@ -199,6 +227,17 @@ function getDateRange(key) {
     case "ytd":
       start = new Date(now.getFullYear(), 0, 1);
       break;
+    case "last_30":
+      start = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+      break;
+    case "custom": {
+      const sv = document.getElementById("customStart").value;
+      const ev = document.getElementById("customEnd").value;
+      start = sv ? parseLocalDate(sv) : DATA_START;
+      end   = ev ? endOfDay(parseLocalDate(ev)) : endOfDay(now);
+      if (start > end) { const t = start; start = startOfDay(end); end = endOfDay(t); }
+      break;
+    }
     case "this_month":
       start = new Date(now.getFullYear(), now.getMonth(), 1);
       break;
@@ -279,9 +318,18 @@ function getPassedDate(c) {
   return c.properties?.lead_passed_date || c.properties?.createdate || null;
 }
 
+function matchesSource(c) {
+  const sel = document.getElementById("sourceFilter");
+  const mode = sel ? sel.value : "all";
+  if (mode === "all") return true;
+  const isPaid = c.properties?.hs_analytics_source === "PAID_SOCIAL";
+  return mode === "paid_social" ? isPaid : !isPaid;
+}
+
 function applyGlobalFilter(contacts, rangeKey) {
   const { start, end } = getDateRange(rangeKey);
   return contacts.filter(c => {
+    if (!matchesSource(c)) return false;
     const d = getPassedDate(c);
     if (!d) return false;
     const t = new Date(d);
@@ -331,7 +379,7 @@ function renderSummaryPanel() {
       const content = cnt === 0
         ? `<span class="cell-zero">—</span>`
         : s === "CONNECTED"
-          ? `<span class="cell-val" style="background:${info.bg};color:${info.fg};">$ ${cnt}</span>`
+          ? `<span class="cell-val" style="background:${info.bg};color:${info.fg};">${cnt}</span>`
           : `<span class="cell-val" style="background:${info.bg};color:${info.fg};">${cnt}</span>`;
       return `<td>${content}</td>`;
     }).join("");
@@ -614,6 +662,16 @@ function renderTable(repId) {
 
 function onGlobalDateChange() {
   const key = document.getElementById("globalDateFilter").value;
+  const cr = document.getElementById("customRange");
+  cr.style.display = key === "custom" ? "inline-flex" : "none";
+  if (key === "custom") {
+    const cs = document.getElementById("customStart"), ce = document.getElementById("customEnd");
+    const today = new Date();
+    cs.min = ce.min = toInputDate(DATA_START);
+    cs.max = ce.max = toInputDate(today);
+    if (!cs.value) cs.value = toInputDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29));
+    if (!ce.value) ce.value = toInputDate(today);
+  }
   document.getElementById("rangeLabel").textContent = fmtDateRange(key);
   document.getElementById("headerSubtitle").textContent = fmtDateRange(key);
 
