@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>323 Sports — Sales Rep Dashboard</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1a2e; font-size: 14px; }
+
+    header { background: #1a1a2e; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 18px; font-weight: 600; }
+    .header-left .org { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+    .header-left .subtitle { font-size: 12px; color: #9ca3af; margin-top: 3px; }
+    .header-right { font-size: 12px; color: #9ca3af; text-align: right; }
+
+    .content { padding: 20px 24px; }
+
+    /* Global date filter */
+    .global-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .global-filter label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+    .global-filter select { padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; background: white; outline: none; cursor: pointer; font-weight: 500; color: #1a1a2e; }
+    .global-filter select:focus { border-color: #a5b4fc; }
+    .global-filter .range-label { font-size: 12px; color: #9ca3af; margin-left: 4px; }
+
+    /* Summary bar */
+    .summary-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .summary-card { background: white; border-radius: 8px; padding: 12px 16px; flex: 1; min-width: 110px; border: 1px solid #e5e7eb; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+    .summary-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #a5b4fc; }
+    .summary-card .sc-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; }
+    .summary-card .sc-value { font-size: 26px; font-weight: 700; color: #1a1a2e; line-height: 1.1; margin-top: 2px; }
+    .summary-card .sc-name { font-size: 12px; color: #374151; margin-top: 3px; font-weight: 500; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+    .tab { padding: 8px 14px; border-radius: 8px 8px 0 0; border: 1px solid #e5e7eb; border-bottom: none; background: #f0f2f5; cursor: pointer; font-size: 13px; font-weight: 500; color: #6b7280; transition: background 0.12s; white-space: nowrap; }
+    .tab:hover { background: #e5e7eb; color: #374151; }
+    .tab.active { background: white; color: #1a1a2e; }
+    .tab .badge { display: inline-block; background: #6366f1; color: white; border-radius: 10px; padding: 1px 7px; font-size: 11px; margin-left: 5px; }
+
+    /* Panels */
+    .panel { background: white; border: 1px solid #e5e7eb; border-radius: 0 8px 8px 8px; padding: 16px; display: none; }
+    .panel.active { display: block; }
+
+    /* Per-rep filter bar */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+    .filter-bar input { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; width: 200px; outline: none; }
+    .filter-bar input:focus { border-color: #a5b4fc; }
+    .filter-bar select { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; background: white; outline: none; cursor: pointer; }
+
+    /* Status chips */
+    .status-summary { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .status-chip { padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: #f9fafb; }
+    th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 2px solid #e5e7eb; cursor: pointer; user-select: none; white-space: nowrap; }
+    th:hover { color: #374151; }
+    th .si { margin-left: 3px; opacity: 0.35; }
+    th.sorted .si { opacity: 1; color: #6366f1; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbff; }
+
+    .status { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .contact-name { font-weight: 500; color: #1a1a2e; text-decoration: none; }
+    .contact-name:hover { color: #6366f1; text-decoration: underline; }
+
+    /* Days in status pill */
+    .days-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+    .days-low  { background: #d1fae5; color: #065f46; }
+    .days-mid  { background: #fef3c7; color: #92400e; }
+    .days-high { background: #fee2e2; color: #991b1b; }
+    .days-none { color: #9ca3af; font-size: 12px; }
+
+    /* Pagination */
+    .pagination { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; font-size: 12px; color: #6b7280; border-top: 1px solid #f3f4f6; margin-top: 8px; }
+    .page-btn { padding: 4px 10px; border: 1px solid #e5e7eb; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; }
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .page-btn:not(:disabled):hover { background: #f5f5ff; border-color: #a5b4fc; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 48px; color: #6b7280; }
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #e5e7eb; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.75s linear infinite; margin-bottom: 10px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .load-note { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+
+    .error-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 14px 18px; color: #991b1b; margin: 20px 0; font-size: 13px; }
+    .error-box pre { margin-top: 8px; font-size: 11px; white-space: pre-wrap; word-break: break-all; background: #fff5f5; padding: 8px; border-radius: 4px; }
+    .empty-row { text-align: center; padding: 28px; color: #9ca3af; font-style: italic; }
+    .data-note { font-size: 11px; color: #9ca3af; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; }
+
+    /* Summary tab styles */
+    .summary-section-title { font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .matrix-wrap { overflow-x: auto; margin-bottom: 28px; }
+    .matrix-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .matrix-table th { padding: 8px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; text-align: center; }
+    .matrix-table th.rep-col { text-align: left; min-width: 130px; }
+    .matrix-table td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; text-align: center; font-weight: 600; font-size: 13px; }
+    .matrix-table td.rep-name { text-align: left; font-weight: 600; color: #1a1a2e; cursor: pointer; }
+    .matrix-table td.rep-name:hover { color: #6366f1; text-decoration: underline; }
+    .matrix-table tr:last-child td { border-bottom: none; }
+    .matrix-table tr:hover td { background: #fafbff; }
+    .matrix-table td.total-col { font-weight: 700; color: #1a1a2e; background: #f9fafb; }
+    .matrix-table tfoot td { font-weight: 700; background: #f9fafb; border-top: 2px solid #e5e7eb; }
+    .matrix-table tfoot td.rep-name { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .cell-zero { color: #d1d5db; font-weight: 400; }
+    .cell-val { display: inline-block; min-width: 24px; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="org">323 Sports</div>
+    <h1>Sales Rep Dashboard</h1>
+    <div class="subtitle" id="headerSubtitle">Loading…</div>
+  </div>
+  <div class="header-right" id="lastUpdated"></div>
+</header>
+
+<div class="content">
+  <div id="loadingState" class="loading">
+    <div class="spinner"></div>
+    <div>Loading contacts from HubSpot…</div>
+    <div class="load-note" id="loadProgress"></div>
+  </div>
+  <div id="errorState" style="display:none;"></div>
+  <div id="dashboard" style="display:none;">
+    <div class="global-filter">
+      <label>Date Range</label>
+      <select id="globalDateFilter" onchange="onGlobalDateChange()">
+        <option value="ytd">Year to Date</option>
+        <option value="this_month">This Month</option>
+        <option value="last_month">Last Month</option>
+        <option value="this_week">This Week</option>
+        <option value="last_week">Last Week</option>
+      </select>
+      <span class="range-label" id="rangeLabel"></span>
+    </div>
+    <div class="summary-bar" id="summaryBar"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="panels"></div>
+  </div>
+</div>
+
+<script>
+const REPS = [
+  { id: "30688400",  name: "Mark Barth" },
+  { id: "30717295",  name: "Travis Woodham" },
+  { id: "30719424",  name: "Jonathan Peckham" },
+  { id: "30772289",  name: "Jackie Fingleton" },
+  { id: "33234717",  name: "Chad Robbins" },
+  { id: "349482852", name: "Colt Schiefer" }
+];
+
+const LEAD_STATUS = {
+  NEW:                  { label: "Initial Contact Sent", bg: "#dbeafe", fg: "#1d4ed8" },
+  IN_PROGRESS:          { label: "In Communication",     bg: "#fef3c7", fg: "#b45309" },
+  PASSED:               { label: "Passed",               bg: "#ede9fe", fg: "#7c3aed" },
+  OPEN:                 { label: "Mock Up Sent",         bg: "#cffafe", fg: "#0e7490" },
+  OPEN_DEAL:            { label: "Estimate Sent",        bg: "#d1fae5", fg: "#065f46" },
+  CONNECTED:            { label: "Sale Closed",          bg: "#bbf7d0", fg: "#14532d" },
+  BAD_TIMING:           { label: "Bad Timing",           bg: "#f3f4f6", fg: "#374151" },
+  UNQUALIFIED:          { label: "Not Interested",       bg: "#fee2e2", fg: "#991b1b" },
+  ATTEMPTED_TO_CONTACT: { label: "Did Not Respond",      bg: "#ffedd5", fg: "#9a3412" },
+};
+
+const HS_BASE  = "https://app.hubspot.com/contacts/4006218/record/0-1/";
+const PAGE_SIZE = 50;
+
+let allContacts  = [];   // everything loaded from HubSpot (YTD)
+let repContacts  = {};   // filtered by global date, grouped by rep
+const sortState   = {};
+const pageState   = {};
+const filterState = {};
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function startOfDay(d) {
+  const x = new Date(d); x.setHours(0,0,0,0); return x;
+}
+function endOfDay(d) {
+  const x = new Date(d); x.setHours(23,59,59,999); return x;
+}
+function getMonday(d) {
+  const x = new Date(d);
+  const day = x.getDay() || 7;
+  x.setDate(x.getDate() - day + 1);
+  return startOfDay(x);
+}
+
+function getDateRange(key) {
+  const now = new Date();
+  let start, end = endOfDay(now);
+  switch (key) {
+    case "ytd":
+      start = new Date(now.getFullYear(), 0, 1);
+      break;
+    case "this_month":
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case "last_month": {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end   = endOfDay(new Date(now.getFullYear(), now.getMonth(), 0));
+      break;
+    }
+    case "this_week":
+      start = getMonday(now);
+      break;
+    case "last_week": {
+      const thisMonday = getMonday(now);
+      end   = endOfDay(new Date(thisMonday - 1));
+      start = getMonday(end);
+      break;
+    }
+    default:
+      start = new Date(now.getFullYear(), 0, 1);
+  }
+  return { start, end };
+}
+
+function fmtDateRange(key) {
+  const { start, end } = getDateRange(key);
+  const opts = { month: "short", day: "numeric" };
+  const optsY = { month: "short", day: "numeric", year: "numeric" };
+  return `${start.toLocaleDateString("en-US", opts)} – ${end.toLocaleDateString("en-US", optsY)}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function fmtDateShort(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+}
+
+function daysPill(iso, leadStatus) {
+  // Sale Closed gets a green $ instead of days
+  if (leadStatus === "CONNECTED") {
+    return `<span class="days-pill" style="background:#bbf7d0;color:#14532d;font-size:15px;padding:2px 10px;">$</span>`;
+  }
+  const d = daysAgo(iso);
+  if (d === null) return `<span class="days-none">—</span>`;
+  let cls = "days-low";
+  if (d >= 14) cls = "days-high";
+  else if (d >= 7) cls = "days-mid";
+  return `<span class="days-pill ${cls}">${d}d</span>`;
+}
+
+function statusBadge(s) {
+  const info = LEAD_STATUS[s];
+  if (!info) return `<span class="status" style="background:#f3f4f6;color:#6b7280;">${s||"—"}</span>`;
+  return `<span class="status" style="background:${info.bg};color:${info.fg};">${info.label}</span>`;
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+
+const __DATA__ = /*__DATA__*/null;
+
+async function loadAllContacts() {
+  if (!__DATA__ || !Array.isArray(__DATA__.contacts)) throw new Error("No data embedded in this build.");
+  return __DATA__.contacts;
+}
+
+// ── Filtering & grouping ──────────────────────────────────────────────────────
+
+function getPassedDate(c) {
+  // Prefer lead_passed_date; fall back to createdate
+  return c.properties?.lead_passed_date || c.properties?.createdate || null;
+}
+
+function applyGlobalFilter(contacts, rangeKey) {
+  const { start, end } = getDateRange(rangeKey);
+  return contacts.filter(c => {
+    const d = getPassedDate(c);
+    if (!d) return false;
+    const t = new Date(d);
+    return t >= start && t <= end;
+  });
+}
+
+function groupByRep(contacts) {
+  const map = {};
+  REPS.forEach(r => { map[r.id] = []; });
+  contacts.forEach(c => {
+    const oid = c.properties?.hubspot_owner_id;
+    if (map[oid] !== undefined) map[oid].push(c);
+  });
+  return map;
+}
+
+// ── Summary panel ─────────────────────────────────────────────────────────────
+
+// All status keys in a fixed display order
+const STATUS_ORDER = ["NEW","IN_PROGRESS","PASSED","OPEN","OPEN_DEAL","CONNECTED","BAD_TIMING","UNQUALIFIED","ATTEMPTED_TO_CONTACT"];
+
+function renderSummaryPanel() {
+  const el = document.getElementById("panel-summary");
+  if (!el) return;
+
+  // Determine which statuses actually have data (to keep matrix compact)
+  const activeCols = STATUS_ORDER.filter(s =>
+    REPS.some(rep => (repContacts[rep.id]||[]).some(c => c.properties?.hs_lead_status === s))
+  );
+
+  // Build matrix
+  let matrixRows = "";
+  const colTotals = {};
+  activeCols.forEach(s => { colTotals[s] = 0; });
+  let grandTotal = 0;
+
+  REPS.forEach(rep => {
+    const contacts = repContacts[rep.id] || [];
+    const rowTotal = contacts.length;
+    grandTotal += rowTotal;
+
+    let cells = activeCols.map(s => {
+      const cnt = contacts.filter(c => c.properties?.hs_lead_status === s).length;
+      colTotals[s] += cnt;
+      const info = LEAD_STATUS[s] || { bg:"#f3f4f6", fg:"#6b7280" };
+      const content = cnt === 0
+        ? `<span class="cell-zero">—</span>`
+        : s === "CONNECTED"
+          ? `<span class="cell-val" style="background:${info.bg};color:${info.fg};">$ ${cnt}</span>`
+          : `<span class="cell-val" style="background:${info.bg};color:${info.fg};">${cnt}</span>`;
+      return `<td>${content}</td>`;
+    }).join("");
+
+    matrixRows += `<tr>
+      <td class="rep-name" onclick="switchTab('${rep.id}')">${rep.name}</td>
+      ${cells}
+      <td class="total-col">${rowTotal}</td>
+    </tr>`;
+  });
+
+  // Totals footer
+  const footerCells = activeCols.map(s => {
+    const info = LEAD_STATUS[s] || { bg:"#f3f4f6", fg:"#6b7280" };
+    return `<td><span class="cell-val" style="background:${info.bg};color:${info.fg};">${colTotals[s]||"—"}</span></td>`;
+  }).join("");
+
+  const headerCols = activeCols.map(s => {
+    const info = LEAD_STATUS[s] || { label: s };
+    return `<th>${info.label}</th>`;
+  }).join("");
+
+  // All-reps contact list (sorted by passed date desc, all reps combined)
+  const allFiltered = REPS.flatMap(rep =>
+    (repContacts[rep.id] || []).map(c => ({ ...c, _repName: rep.name }))
+  ).sort((a,b) => {
+    const da = a.properties?.lead_passed_date || a.properties?.createdate || "";
+    const db = b.properties?.lead_passed_date || b.properties?.createdate || "";
+    return db.localeCompare(da);
+  });
+
+  const listRows = allFiltered.slice(0, 100).map(c => {
+    const p = c.properties || {};
+    const name = `${p.firstname||""} ${p.lastname||""}`.trim() || "(unnamed)";
+    const pd = p.lead_passed_date || p.createdate;
+    return `<tr>
+      <td><a class="contact-name" href="${HS_BASE}${c.id}" target="_blank">${name}</a></td>
+      <td style="color:#6b7280;font-size:12px;">${c._repName}</td>
+      <td>${fmtDate(pd)}${!p.lead_passed_date?'<span style="font-size:10px;color:#d1d5db;"> *</span>':''}</td>
+      <td>${statusBadge(p.hs_lead_status)}</td>
+      <td style="text-align:center;">${daysPill(p.lead_status_change, p.hs_lead_status)}</td>
+      <td style="text-align:center;">${p.num_contacted_notes||"0"}</td>
+      <td>${fmtDateShort(p.notes_last_contacted)}</td>
+    </tr>`;
+  }).join("");
+
+  const moreNote = allFiltered.length > 100
+    ? `<div style="font-size:12px;color:#9ca3af;padding-top:8px;">Showing most recent 100 of ${allFiltered.length} contacts. Use individual rep tabs to see all.</div>`
+    : "";
+
+  el.innerHTML = `
+    <div class="summary-section-title">Pipeline by Rep</div>
+    <div class="matrix-wrap">
+      <table class="matrix-table">
+        <thead><tr>
+          <th class="rep-col">Rep</th>
+          ${headerCols}
+          <th>Total</th>
+        </tr></thead>
+        <tbody>${matrixRows}</tbody>
+        <tfoot><tr>
+          <td class="rep-name">Total</td>
+          ${footerCells}
+          <td class="total-col">${grandTotal}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+
+    <div class="summary-section-title">All Contacts — Most Recent</div>
+    <table>
+      <thead><tr>
+        <th>Contact</th>
+        <th>Rep</th>
+        <th>Passed Date</th>
+        <th>Lead Status</th>
+        <th style="text-align:center;">Days in Status</th>
+        <th style="text-align:center;">Times Contacted</th>
+        <th>Last Contacted</th>
+      </tr></thead>
+      <tbody>${listRows || '<tr><td colspan="7" class="empty-row">No contacts in this date range.</td></tr>'}</tbody>
+    </table>
+    ${moreNote}
+    <div class="data-note">Click any rep name in the matrix to jump to their tab. * = no Lead Passed Date set, showing create date.</div>
+  `;
+}
+
+// ── UI building ───────────────────────────────────────────────────────────────
+
+function buildSummaryBar() {
+  document.getElementById("summaryBar").innerHTML = REPS.map(rep => {
+    const n = (repContacts[rep.id] || []).length;
+    return `<div class="summary-card" onclick="switchTab('${rep.id}')">
+      <div class="sc-label">Contacts</div>
+      <div class="sc-value">${n}</div>
+      <div class="sc-name">${rep.name}</div>
+    </div>`;
+  }).join("");
+}
+
+function rebuildPanelChipsAndSelect(repId) {
+  const contacts = repContacts[repId] || [];
+  const sCounts = {};
+  contacts.forEach(c => {
+    const s = c.properties?.hs_lead_status || "unknown";
+    sCounts[s] = (sCounts[s] || 0) + 1;
+  });
+
+  // Chips
+  const chipHtml = Object.entries(sCounts).sort((a,b)=>b[1]-a[1]).map(([s,cnt]) => {
+    const info = LEAD_STATUS[s] || { bg:"#f3f4f6", fg:"#6b7280", label:s };
+    return `<span class="status-chip" style="background:${info.bg};color:${info.fg};">${info.label}: ${cnt}</span>`;
+  }).join("");
+  const chipsEl = document.getElementById(`chips-${repId}`);
+  if (chipsEl) chipsEl.innerHTML = chipHtml;
+
+  // Status select
+  const sel = document.getElementById(`statusFilter-${repId}`);
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">All statuses</option>` +
+      Object.entries(sCounts).sort((a,b)=>b[1]-a[1]).map(([s,cnt]) => {
+        const info = LEAD_STATUS[s] || { label:s };
+        return `<option value="${s}" ${s===cur?"selected":""}>${info.label} (${cnt})</option>`;
+      }).join("");
+  }
+
+  // Tab badge
+  const badge = document.querySelector(`#tab-${repId} .badge`);
+  if (badge) badge.textContent = contacts.length;
+}
+
+function buildUI() {
+  buildSummaryBar();
+  const tabsEl   = document.getElementById("tabs");
+  const panelsEl = document.getElementById("panels");
+  tabsEl.innerHTML = panelsEl.innerHTML = "";
+
+  // ── Summary tab (first) ──
+  const summaryTab = document.createElement("div");
+  summaryTab.className = "tab active";
+  summaryTab.id = "tab-summary";
+  summaryTab.textContent = "All Reps";
+  summaryTab.onclick = () => switchTab("summary");
+  tabsEl.appendChild(summaryTab);
+
+  const summaryPanel = document.createElement("div");
+  summaryPanel.className = "panel active";
+  summaryPanel.id = "panel-summary";
+  panelsEl.appendChild(summaryPanel);
+  renderSummaryPanel();
+
+  REPS.forEach((rep, i) => {
+    const contacts = repContacts[rep.id] || [];
+
+    // Tab (never active by default — summary tab is default)
+    const tab = document.createElement("div");
+    tab.className = "tab";
+    tab.id = `tab-${rep.id}`;
+    tab.innerHTML = `${rep.name} <span class="badge">${contacts.length}</span>`;
+    tab.onclick = () => switchTab(rep.id);
+    tabsEl.appendChild(tab);
+
+    // Status counts for initial build
+    const sCounts = {};
+    contacts.forEach(c => {
+      const s = c.properties?.hs_lead_status || "unknown";
+      sCounts[s] = (sCounts[s] || 0) + 1;
+    });
+    const chipHtml = Object.entries(sCounts).sort((a,b)=>b[1]-a[1]).map(([s,cnt]) => {
+      const info = LEAD_STATUS[s] || { bg:"#f3f4f6", fg:"#6b7280", label:s };
+      return `<span class="status-chip" style="background:${info.bg};color:${info.fg};">${info.label}: ${cnt}</span>`;
+    }).join("");
+    const statusOpts = Object.entries(sCounts).sort((a,b)=>b[1]-a[1]).map(([s,cnt]) => {
+      const info = LEAD_STATUS[s] || { label:s };
+      return `<option value="${s}">${info.label} (${cnt})</option>`;
+    }).join("");
+
+    // Panel (never active by default)
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.id = `panel-${rep.id}`;
+    panel.innerHTML = `
+      <div class="filter-bar">
+        <input type="text" placeholder="Search by name…" id="search-${rep.id}" oninput="onFilter('${rep.id}')">
+        <select id="statusFilter-${rep.id}" onchange="onFilter('${rep.id}')">
+          <option value="">All statuses</option>${statusOpts}
+        </select>
+      </div>
+      <div class="status-summary" id="chips-${rep.id}">${chipHtml}</div>
+      <div id="tableWrap-${rep.id}"></div>
+      <div class="data-note">
+        "Passed Date" = Lead Passed Date (custom HubSpot property; * = no passed date set, showing create date instead).
+        "Days in Status" = days since Lead Status last changed — blank (—) means HubSpot has not recorded a status change for this contact yet (status was set on creation and has not been updated since).
+      </div>`;
+    panelsEl.appendChild(panel);
+
+    sortState[rep.id]   = { col: "lead_passed_date", dir: "desc" };
+    pageState[rep.id]   = 1;
+    filterState[rep.id] = { search: "", status: "" };
+    renderTable(rep.id);
+  });
+}
+
+// ── Table renderer ────────────────────────────────────────────────────────────
+
+function renderTable(repId) {
+  const contacts = repContacts[repId] || [];
+  const { search, status } = filterState[repId] || {};
+  const ss   = sortState[repId]   || { col: "lead_passed_date", dir: "desc" };
+  const page = pageState[repId]   || 1;
+
+  let filtered = contacts.filter(c => {
+    const p = c.properties || {};
+    const name = `${p.firstname||""} ${p.lastname||""}`.toLowerCase();
+    return (!search || name.includes(search.toLowerCase())) &&
+           (!status || p.hs_lead_status === status);
+  });
+
+  filtered.sort((a, b) => {
+    const pa = a.properties||{}, pb = b.properties||{};
+    let va, vb;
+    if      (ss.col === "name")                va = `${pa.firstname||""} ${pa.lastname||""}`.toLowerCase(),
+                                               vb = `${pb.firstname||""} ${pb.lastname||""}`.toLowerCase();
+    else if (ss.col === "num_contacted_notes") va = +(pa.num_contacted_notes||0), vb = +(pb.num_contacted_notes||0);
+    else if (ss.col === "days_in_status")      va = daysAgo(pa.lead_status_change)||0, vb = daysAgo(pb.lead_status_change)||0;
+    else if (ss.col === "lead_passed_date")    va = pa.lead_passed_date || pa.createdate || "", vb = pb.lead_passed_date || pb.createdate || "";
+    else                                       va = pa[ss.col]||"", vb = pb[ss.col]||"";
+    if (va < vb) return ss.dir==="asc" ? -1 :  1;
+    if (va > vb) return ss.dir==="asc" ?  1 : -1;
+    return 0;
+  });
+
+  const totalF  = filtered.length;
+  const totalPg = Math.max(1, Math.ceil(totalF / PAGE_SIZE));
+  const safePg  = Math.min(page, totalPg);
+  const slice   = filtered.slice((safePg-1)*PAGE_SIZE, safePg*PAGE_SIZE);
+
+  const si  = col => ss.col===col ? `<span class="si">${ss.dir==="asc"?"↑":"↓"}</span>` : `<span class="si">↕</span>`;
+  const thc = col => ss.col===col ? "sorted" : "";
+
+  const rows = slice.length===0
+    ? `<tr><td colspan="6" class="empty-row">No contacts match your filters.</td></tr>`
+    : slice.map(c => {
+        const p    = c.properties||{};
+        const name = `${p.firstname||""} ${p.lastname||""}`.trim() || "(unnamed)";
+        const pd   = p.lead_passed_date || p.createdate;
+        return `<tr>
+          <td><a class="contact-name" href="${HS_BASE}${c.id}" target="_blank">${name}</a></td>
+          <td>${fmtDate(pd)}${!p.lead_passed_date ? ' <span style="font-size:10px;color:#d1d5db;" title="No Lead Passed Date set; showing Create Date">*</span>' : ''}</td>
+          <td>${statusBadge(p.hs_lead_status)}</td>
+          <td style="text-align:center;">${daysPill(p.lead_status_change, p.hs_lead_status)}</td>
+          <td style="text-align:center;">${p.num_contacted_notes||"0"}</td>
+          <td>${fmtDateShort(p.notes_last_contacted)}</td>
+        </tr>`;
+      }).join("");
+
+  document.getElementById(`tableWrap-${repId}`).innerHTML = `
+    <table>
+      <thead><tr>
+        <th class="${thc("name")}"                 onclick="onSort('${repId}','name')">Contact ${si("name")}</th>
+        <th class="${thc("lead_passed_date")}"     onclick="onSort('${repId}','lead_passed_date')">Passed Date ${si("lead_passed_date")}</th>
+        <th class="${thc("hs_lead_status")}"       onclick="onSort('${repId}','hs_lead_status')">Lead Status ${si("hs_lead_status")}</th>
+        <th class="${thc("days_in_status")}"       onclick="onSort('${repId}','days_in_status')" style="text-align:center;">Days in Status ${si("days_in_status")}</th>
+        <th class="${thc("num_contacted_notes")}"  onclick="onSort('${repId}','num_contacted_notes')" style="text-align:center;">Times Contacted ${si("num_contacted_notes")}</th>
+        <th class="${thc("notes_last_contacted")}" onclick="onSort('${repId}','notes_last_contacted')">Last Contacted ${si("notes_last_contacted")}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="pagination">
+      <span>${totalF} contact${totalF!==1?"s":""}${search||status?" (filtered)":""}</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="page-btn" ${safePg<=1?"disabled":""} onclick="onPage('${repId}',${safePg-1})">← Prev</button>
+        <span>Page ${safePg} of ${totalPg}</span>
+        <button class="page-btn" ${safePg>=totalPg?"disabled":""} onclick="onPage('${repId}',${safePg+1})">Next →</button>
+      </div>
+    </div>`;
+}
+
+// ── Event handlers ────────────────────────────────────────────────────────────
+
+function onGlobalDateChange() {
+  const key = document.getElementById("globalDateFilter").value;
+  document.getElementById("rangeLabel").textContent = fmtDateRange(key);
+  document.getElementById("headerSubtitle").textContent = fmtDateRange(key);
+
+  // Re-filter from full dataset and rebuild summary + tables
+  repContacts = groupByRep(applyGlobalFilter(allContacts, key));
+  buildSummaryBar();
+  renderSummaryPanel();
+  REPS.forEach(rep => {
+    rebuildPanelChipsAndSelect(rep.id);
+    pageState[rep.id] = 1;
+    renderTable(rep.id);
+  });
+}
+
+function switchTab(repId) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.getElementById(`tab-${repId}`)?.classList.add("active");
+  document.getElementById(`panel-${repId}`)?.classList.add("active");
+}
+
+function onFilter(repId) {
+  filterState[repId] = {
+    search: document.getElementById(`search-${repId}`)?.value||"",
+    status: document.getElementById(`statusFilter-${repId}`)?.value||""
+  };
+  pageState[repId] = 1;
+  renderTable(repId);
+}
+
+function onSort(repId, col) {
+  const cur = sortState[repId]||{ col:"lead_passed_date", dir:"desc" };
+  sortState[repId] = { col, dir: cur.col===col && cur.dir==="asc" ? "desc" : "asc" };
+  pageState[repId] = 1;
+  renderTable(repId);
+}
+
+function onPage(repId, page) {
+  pageState[repId] = page;
+  renderTable(repId);
+}
+
+function showError(title, detail) {
+  document.getElementById("loadingState").style.display = "none";
+  document.getElementById("errorState").style.display = "block";
+  document.getElementById("errorState").innerHTML =
+    `<div class="error-box"><strong>${title}</strong><pre>${detail}</pre></div>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  const now = new Date();
+  const asOf = __DATA__ && __DATA__.generatedAt ? new Date(__DATA__.generatedAt) : now;
+  document.getElementById("lastUpdated").textContent =
+    `Data as of ${asOf.toLocaleDateString("en-US",{month:"short",day:"numeric"})}, ${asOf.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
+
+  try {
+    allContacts = await loadAllContacts();
+
+    // Default view: YTD
+    const defaultKey = "ytd";
+    repContacts = groupByRep(applyGlobalFilter(allContacts, defaultKey));
+
+    document.getElementById("headerSubtitle").textContent = fmtDateRange(defaultKey);
+    document.getElementById("rangeLabel").textContent     = fmtDateRange(defaultKey);
+    document.getElementById("globalDateFilter").value     = defaultKey;
+
+    document.getElementById("loadingState").style.display = "none";
+    document.getElementById("dashboard").style.display    = "block";
+    buildUI();
+  } catch(err) {
+    showError("Could not load HubSpot data", err?.message || String(err));
+  }
+}
+
+init();
+</script>
+</body>
+</html>
