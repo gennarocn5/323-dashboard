@@ -1,0 +1,39 @@
+name: Refresh dashboard
+
+on:
+  schedule:
+    - cron: "0 11 * * *"   # daily ~6-7am Central
+  workflow_dispatch:        # "Run workflow" button for manual refreshes
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build from HubSpot
+        env:
+          HUBSPOT_TOKEN: ${{ secrets.HUBSPOT_TOKEN }}
+        run: node build.js
+      - name: Encrypt with password
+        env:
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          npx --yes staticrypt@3 dist/index.html -p "$DASHBOARD_PASSWORD" --short -d . \
+            --remember 30 \
+            --template-title "323 Sports Sales Dashboard" \
+            --template-instructions "Enter the password to view the dashboard." \
+            --template-button "View dashboard" \
+            --template-color-primary "#0f172a" --template-color-secondary "#f1f5f9"
+      - name: Publish
+        run: |
+          git config user.name "dashboard-bot"
+          git config user.email "dashboard-bot@users.noreply.github.com"
+          git add index.html .staticrypt.json
+          git diff --cached --quiet || git commit -m "Daily dashboard refresh"
+          git push
