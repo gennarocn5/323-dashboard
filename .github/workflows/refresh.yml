@@ -2,25 +2,49 @@ name: Refresh dashboard
 
 on:
   schedule:
-    - cron: "0 11 * * *"   # daily ~6-7am Central
+    # GitHub often starts scheduled jobs late, so check every 10 minutes during the
+    # morning (UTC) and let the "gate" step below build once per day, as soon as it's
+    # 8:55 AM or later in New York. Works for both EDT and EST automatically.
+    - cron: "7,17,27,37,47,57 12-17 * * *"
   workflow_dispatch:        # "Run workflow" button for manual refreshes
 
 permissions:
   contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Gate (once per day, after 8:55 AM Eastern)
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          NOW=$(TZ=America/New_York date +%H%M)
+          TODAY=$(TZ=America/New_York date +%F)
+          LAST=$(cat last-scheduled-build.txt 2>/dev/null || echo none)
+          if [ $((10#$NOW)) -ge 855 ] && [ "$LAST" != "$TODAY" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "$TODAY" > last-scheduled-build.txt
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping: NY time $NOW, last scheduled build $LAST"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'true'
         with:
-          node-version: 20
+          node-version: 22
       - name: Build from HubSpot
+        if: steps.gate.outputs.go == 'true'
         env:
           HUBSPOT_TOKEN: ${{ secrets.HUBSPOT_TOKEN }}
         run: node build.js
       - name: Encrypt with password
+        if: steps.gate.outputs.go == 'true'
         env:
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
         run: |
@@ -31,9 +55,11 @@ jobs:
             --template-button "View dashboard" \
             --template-color-primary "#0f172a" --template-color-secondary "#f1f5f9"
       - name: Publish
+        if: steps.gate.outputs.go == 'true'
         run: |
           git config user.name "dashboard-bot"
           git config user.email "dashboard-bot@users.noreply.github.com"
           git add index.html .staticrypt.json
+          if [ -f last-scheduled-build.txt ]; then git add last-scheduled-build.txt; fi
           git diff --cached --quiet || git commit -m "Daily dashboard refresh"
           git push
