@@ -48,6 +48,9 @@
     .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
     .filter-bar input { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; width: 200px; outline: none; }
     .filter-bar input:focus { border-color: #a5b4fc; }
+    .copy-btn { margin-left: auto; padding: 6px 12px; border: 1px solid #c7d2fe; border-radius: 6px; font-size: 13px; background: #eef2ff; color: #3730a3; cursor: pointer; font-weight: 600; }
+    .copy-btn:hover { background: #e0e7ff; }
+    .copy-btn.copied { background: #dcfce7; border-color: #86efac; color: #14532d; }
     .filter-bar select { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; background: white; outline: none; cursor: pointer; }
 
     /* Status chips */
@@ -567,6 +570,7 @@ function buildUI() {
         <select id="statusFilter-${rep.id}" onchange="onFilter('${rep.id}')">
           <option value="">All statuses</option>${statusOpts}
         </select>
+        <button class="copy-btn" onclick="copyLinkedNames('${rep.id}', this)" title="Copies every contact in the current view (all pages) as clickable names">Copy linked names</button>
       </div>
       <div class="status-summary" id="chips-${rep.id}">${chipHtml}</div>
       <div id="tableWrap-${rep.id}"></div>
@@ -585,11 +589,10 @@ function buildUI() {
 
 // ── Table renderer ────────────────────────────────────────────────────────────
 
-function renderTable(repId) {
+function getFilteredSorted(repId) {
   const contacts = repContacts[repId] || [];
   const { search, status } = filterState[repId] || {};
   const ss   = sortState[repId]   || { col: "lead_passed_date", dir: "desc" };
-  const page = pageState[repId]   || 1;
 
   let filtered = contacts.filter(c => {
     const p = c.properties || {};
@@ -611,6 +614,55 @@ function renderTable(repId) {
     if (va > vb) return ss.dir==="asc" ?  1 : -1;
     return 0;
   });
+  return filtered;
+}
+
+// Copy the current view's contacts as clickable names (rich text for email, Markdown links as plain-text fallback)
+async function copyLinkedNames(repId, btn) {
+  const list = getFilteredSorted(repId);
+  const esc = t => t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const items = list.map(c => {
+    const p = c.properties || {};
+    return { name: `${p.firstname||""} ${p.lastname||""}`.trim() || "(unnamed)", url: `${HS_BASE}${c.id}` };
+  });
+  const label = btn.textContent;
+  const flash = (txt, ok) => {
+    btn.textContent = txt; btn.classList.toggle("copied", ok);
+    setTimeout(() => { btn.textContent = label; btn.classList.remove("copied"); }, 2000);
+  };
+  if (!items.length) { flash("No contacts to copy", false); return; }
+  const html  = items.map(i => `<a href="${esc(i.url)}">${esc(i.name)}</a>`).join("<br>");
+  const plain = items.map(i => `[${i.name}](${i.url})`).join("\n");
+  let ok = false;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html":  new Blob([html],  { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" })
+      })]);
+      ok = true;
+    }
+  } catch (e) { ok = false; }
+  if (!ok) {
+    // Fallback: copy a hidden rich-text element with the browser's copy command
+    const div = document.createElement("div");
+    div.contentEditable = "true";
+    div.style.cssText = "position:fixed;left:-9999px;top:0;";
+    div.innerHTML = html;
+    document.body.appendChild(div);
+    const range = document.createRange(); range.selectNodeContents(div);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    sel.removeAllRanges(); div.remove();
+  }
+  flash(ok ? `Copied ${items.length} name${items.length===1?"":"s"}` : "Copy blocked by browser", ok);
+}
+
+function renderTable(repId) {
+  const ss   = sortState[repId]   || { col: "lead_passed_date", dir: "desc" };
+  const page = pageState[repId]   || 1;
+  const { search, status } = filterState[repId] || {};
+  const filtered = getFilteredSorted(repId);
 
   const totalF  = filtered.length;
   const totalPg = Math.max(1, Math.ceil(totalF / PAGE_SIZE));
