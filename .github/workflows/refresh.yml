@@ -1,11 +1,15 @@
 name: Refresh dashboard
 
 on:
+  # Primary: a Zapier schedule saves a file in triggers/ every day at 9:00 AM Eastern,
+  # which starts this job right away.
+  push:
+    branches: [main]
+    paths: ["triggers/**"]
+  # Backup: GitHub's own scheduler (often late or skipped). Only builds if nothing
+  # has built yet today and it's 10:00 AM Eastern or later.
   schedule:
-    # GitHub often starts scheduled jobs late, so check every 10 minutes during the
-    # morning (UTC) and let the "gate" step below build once per day, as soon as it's
-    # 8:55 AM or later in New York. Works for both EDT and EST automatically.
-    - cron: "7,17,27,37,47,57 12-17 * * *"
+    - cron: "7,17,27,37,47,57 14-20 * * *"
   workflow_dispatch:        # "Run workflow" button for manual refreshes
 
 permissions:
@@ -20,19 +24,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Gate (once per day, after 8:55 AM Eastern)
+      - name: Gate
         id: gate
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          NOW=$(TZ=America/New_York date +%H%M)
           TODAY=$(TZ=America/New_York date +%F)
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "$TODAY" > last-scheduled-build.txt
+            exit 0
+          fi
+          NOW=$(TZ=America/New_York date +%H%M)
           LAST=$(cat last-scheduled-build.txt 2>/dev/null || echo none)
-          if [ $((10#$NOW)) -ge 855 ] && [ "$LAST" != "$TODAY" ]; then
+          if [ $((10#$NOW)) -ge 1000 ] && [ "$LAST" != "$TODAY" ]; then
             echo "go=true" >> "$GITHUB_OUTPUT"
             echo "$TODAY" > last-scheduled-build.txt
           else
             echo "go=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping: NY time $NOW, last scheduled build $LAST"
+            echo "Skipping backup run: NY time $NOW, last build $LAST"
           fi
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.go == 'true'
@@ -59,7 +67,7 @@ jobs:
         run: |
           git config user.name "dashboard-bot"
           git config user.email "dashboard-bot@users.noreply.github.com"
-          git add index.html .staticrypt.json
-          if [ -f last-scheduled-build.txt ]; then git add last-scheduled-build.txt; fi
+          git rm -r -q --ignore-unmatch triggers
+          git add index.html .staticrypt.json last-scheduled-build.txt
           git diff --cached --quiet || git commit -m "Daily dashboard refresh"
           git push
